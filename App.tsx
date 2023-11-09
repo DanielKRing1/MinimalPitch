@@ -27,7 +27,8 @@ import {
   LearnMoreLinks,
   ReloadInstructions,
 } from 'react-native/Libraries/NewAppScreen';
-import {main} from './src';
+import {main} from './engine';
+import Main from './ui';
 
 type SectionProps = PropsWithChildren<{
   title: string;
@@ -63,19 +64,19 @@ function Section({children, title}: SectionProps): JSX.Element {
 function App(): JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
 
-  const [lastTimestamp, setLastTimestamp] = useState(Date.now());
-  const [elapsedTime, setElapsedTime] = useState(0);
-  const [data, setData] = useState({});
+  // const [lastTimestamp, setLastTimestamp] = useState(Date.now());
+  // const [elapsedTime, setElapsedTime] = useState(0);
+  // const [data, setData] = useState({});
 
-  useEffect(() => {
-    main(() => setData({}));
-  }, []);
+  // useEffect(() => {
+  //   main(() => setData({}));
+  // }, []);
 
-  useEffect(() => {
-    console.log('data changed');
-    setElapsedTime(Date.now() - lastTimestamp);
-    setLastTimestamp(Date.now());
-  }, [data]);
+  // useEffect(() => {
+  //   console.log('data changed');
+  //   setElapsedTime(Date.now() - lastTimestamp);
+  //   setLastTimestamp(Date.now());
+  // }, [data]);
 
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
@@ -83,7 +84,9 @@ function App(): JSX.Element {
 
   return (
     <SafeAreaView style={backgroundStyle}>
-      <Text>{elapsedTime}</Text>
+      <Main />
+
+      {/* <Text>{elapsedTime}</Text> */}
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor={backgroundStyle.backgroundColor}

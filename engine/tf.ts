@@ -2,6 +2,12 @@ import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-react-native';
 import '@tensorflow/tfjs-react-native/dist/platform_react_native';
 import {getPitchHz} from './hz';
+import {bundleResourceIO} from '@tensorflow/tfjs-react-native';
+
+const modelJson = require('../model/model.json');
+const modelWeights1 = require('../model/group1-shard1of3.bin');
+const modelWeights2 = require('../model/group1-shard2of3.bin');
+const modelWeights3 = require('../model/group1-shard3of3.bin');
 
 let model: tf.GraphModel;
 export const initModel = async () => {
@@ -11,8 +17,12 @@ export const initModel = async () => {
   // console.log('awaited');
   // console.log(tf.getBackend());
 
-  const MODEL_URL = 'https://tfhub.dev/google/tfjs-model/spice/2/default/1';
-  model = await tf.loadGraphModel(MODEL_URL, {fromTFHub: true});
+  // const MODEL_URL = 'https://tfhub.dev/google/tfjs-model/spice/2/default/1';
+  // model = await tf.loadGraphModel(MODEL_URL, {fromTFHub: true});
+
+  model = await tf.loadGraphModel(
+    bundleResourceIO(modelJson, [modelWeights1, modelWeights2, modelWeights3]),
+  );
 };
 
 // Sample lengths of 512
@@ -79,9 +89,11 @@ let offset: number = 0;
 
 let isReady = true;
 
-export const processChunk = async (base64Chunk: string, cb: () => void) => {
+export const processChunk = async (
+  base64Chunk: string,
+  onSuccessfulProcess: (hz: number) => void,
+) => {
   if (!isReady) return;
-  cb();
   isReady = false;
 
   const chunk = Buffer.from(base64Chunk, 'base64');
@@ -131,10 +143,34 @@ export const processChunk = async (base64Chunk: string, cb: () => void) => {
   // // console.log(chunk.subarray(0, 5).map(v => convertUnsignedToSigned(v, 8)));
 
   const s = Date.now();
-  await processPitch(asFloats);
+  const [uncertainties, pitches] = await processPitch(asFloats);
   console.log(`ProcessPitch time: ${Date.now() - s}`);
 
-  isReady = true;
+  let mostCertainty = 0;
+  let mostCertain = -1;
+  for (let i = 0; i < pitches.length; ++i) {
+    let confidence = 1.0 - uncertainties[i];
+    if (confidence > mostCertainty) {
+      mostCertainty = confidence;
+      mostCertain = i;
+    }
+  }
+
+  console.log(getPitchHz(pitches[mostCertain]));
+  console.log(getPitchHz(pitches[pitches.length - 1]));
+  console.log(pitches.map(p => getPitchHz(p)));
+  console.log(uncertainties);
+
+  // console.log('\n\n\n\n');
+  // console.log(asFloats);
+  // console.log('\n\n\n\n');
+
+  const hz: number = getPitchHz(pitches[mostCertain]);
+  onSuccessfulProcess(hz);
+
+  setTimeout(() => {
+    isReady = true;
+  }, 1000 / 60);
 
   // setTimeout(() => {
   //   // let start;
@@ -212,39 +248,11 @@ const processPitch = async (inputData: Float32Array) => {
   ]);
   // console.log(`Data time: ${Date.now() - s}`);
 
-  let mostCertainty = 0;
-  let mostCertain = -1;
-  for (let i = 0; i < pitches.length; ++i) {
-    let confidence = 1.0 - uncertainties[i];
-    if (confidence > mostCertainty) {
-      mostCertainty = confidence;
-      mostCertain = i;
-    }
-  }
+  return [uncertainties, pitches];
 
-  // // console.log(noteFromPitch(getPitchHz(pitches[mostCertain])));
-  // // console.log(pitches.map(p => getPitchHz(p)));
-  // // console.log(uncertainties);
+  // console.log(noteFromPitch(getPitchHz(pitches[mostCertain])));
+  // console.log(pitches.map(p => getPitchHz(p)));
+  // console.log(uncertainties);
   // console.log(`\n\nTime: ${Date.now() - lastTimestamp}\n\n`);
   // lastTimestamp = Date.now();
 };
-
-var noteStrings = [
-  'C',
-  'C#',
-  'D',
-  'D#',
-  'E',
-  'F',
-  'F#',
-  'G',
-  'G#',
-  'A',
-  'A#',
-  'B',
-];
-
-function noteFromPitch(hz: number): string {
-  var noteNum = 12 * (Math.log(hz / 440) / Math.log(2));
-  return noteStrings[(Math.round(noteNum) + 69) % 12];
-}
